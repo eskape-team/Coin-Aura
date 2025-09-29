@@ -1,4 +1,4 @@
-// script.js
+// Import three.js and extras
 import * as THREE from './three.module.js';
 import { FontLoader } from './FontLoader.js';
 import { TextGeometry } from './TextGeometry.js';
@@ -6,73 +6,54 @@ import * as CANNON from './cannon-es.js';
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a1a);
-
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.set(0, 5, 15);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+dirLight.position.set(5, 10, 7.5);
+scene.add(dirLight);
 
 // Physics world
 const world = new CANNON.World();
 world.gravity.set(0, -9.82, 0);
-world.broadphase = new CANNON.NaiveBroadphase();
-world.solver.iterations = 10;
-
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(5, 10, 7.5);
-scene.add(dirLight);
 
 // Materials
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
-const coinMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+const coinMaterial = new CANNON.Material("coinMaterial");
+const shelfMaterial = new CANNON.Material("shelfMaterial");
 
-// Cabinet (back + sides + floor)
-function createWall(w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const wallGeom = new THREE.BoxGeometry(w, h, d);
-  const wallMesh = new THREE.Mesh(wallGeom, wallMaterial);
-  wallMesh.position.set(x, y, z);
-  wallMesh.rotation.set(rx, ry, rz);
-  scene.add(wallMesh);
+// Cabinet (static walls)
+function createWall(x, y, z, w, h, d) {
+  const wallGeometry = new THREE.BoxGeometry(w, h, d);
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, transparent: true, opacity: 0.8 });
+  const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+  wall.position.set(x, y, z);
+  scene.add(wall);
 
   const wallShape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
   const wallBody = new CANNON.Body({ mass: 0 });
   wallBody.addShape(wallShape);
   wallBody.position.set(x, y, z);
-  wallBody.quaternion.setFromEuler(rx, ry, rz);
   world.addBody(wallBody);
 }
 
-// Floor
-createWall(10, 1, 12, 0, -5, 0);
-// Left wall
-createWall(1, 10, 12, -5, 0, 0);
-// Right wall
-createWall(1, 10, 12, 5, 0, 0);
-// Back wall (taller, extends fully)
-createWall(10, 10, 1, 0, 0, -6);
-// Front lip
-createWall(10, 2, 1, 0, -4, 6);
+createWall(0, -5, -10, 10, 10, 1); // back
+createWall(-5, -5, 0, 1, 10, 20); // left
+createWall(5, -5, 0, 1, 10, 20); // right
+createWall(0, -10, 0, 10, 1, 20); // bottom
 
-// Moving shelf
-const shelfGeometry = new THREE.BoxGeometry(8, 0.5, 12);
-const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
-const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
-scene.add(shelf);
+// Moving shelf (extended depth so coins can't fall behind)
+const shelfGeometry = new THREE.BoxGeometry(8, 0.5, 24); 
+const shelfMesh = new THREE.Mesh(shelfGeometry, new THREE.MeshStandardMaterial({ color: 0x0000ff }));
+scene.add(shelfMesh);
 
-const shelfShape = new CANNON.Box(new CANNON.Vec3(4, 0.25, 6));
+const shelfShape = new CANNON.Box(new CANNON.Vec3(4, 0.25, 12));
 const shelfBody = new CANNON.Body({
-  mass: 0, // kinematic
+  mass: 0, 
   type: CANNON.Body.KINEMATIC,
   position: new CANNON.Vec3(0, -4.75, 0)
 });
@@ -81,61 +62,68 @@ world.addBody(shelfBody);
 
 // Coins
 const coins = [];
+
 function dropCoin() {
   const radius = 0.5;
-  const coinGeom = new THREE.CylinderGeometry(radius, radius, 0.2, 32);
-  const coinMesh = new THREE.Mesh(coinGeom, coinMaterial);
-  coinMesh.rotation.x = Math.PI / 2;
+  const coinGeometry = new THREE.CylinderGeometry(radius, radius, 0.2, 32);
+  const coinMesh = new THREE.Mesh(coinGeometry, new THREE.MeshStandardMaterial({ color: 0xFFD700 }));
+  coinMesh.position.set(0, 5, 0);
   scene.add(coinMesh);
 
-  const coinShape = new CANNON.Cylinder(radius, radius, 0.2, 32);
-  const coinBody = new CANNON.Body({ mass: 1 });
+  const coinShape = new CANNON.Cylinder(radius, radius, 0.2, 16);
+  const coinBody = new CANNON.Body({ mass: 1, material: coinMaterial });
   coinBody.addShape(coinShape);
   coinBody.position.set(0, 5, 0);
-  coinBody.quaternion.setFromEuler(Math.PI / 2, 0, 0);
   world.addBody(coinBody);
 
   coins.push({ mesh: coinMesh, body: coinBody });
 }
 
-document.getElementById('dropCoin').addEventListener('click', dropCoin);
+document.getElementById("dropBtn").addEventListener("click", dropCoin);
 
-// Animate shelf
-const shelfSpeed = 1; // slower
-const shelfRange = 2;
+// Animate shelf (forward and backward)
 let shelfDirection = 1;
+const shelfSpeed = 0.5; // slower speed
 
-function animateShelf(delta) {
-  shelfBody.position.z += shelfSpeed * shelfDirection * delta;
-
-  if (shelfBody.position.z > shelfRange) shelfDirection = -1;
-  if (shelfBody.position.z < -shelfRange) shelfDirection = 1;
-
-  shelf.position.copy(shelfBody.position);
-  shelf.quaternion.copy(shelfBody.quaternion);
-}
-
-// Main loop
-let lastTime;
-function animate(time) {
-  requestAnimationFrame(animate);
-
-  if (lastTime !== undefined) {
-    const delta = (time - lastTime) / 1000;
-
-    world.step(1 / 60, delta, 3);
-
-    // Update coins
-    coins.forEach(c => {
-      c.mesh.position.copy(c.body.position);
-      c.mesh.quaternion.copy(c.body.quaternion);
-    });
-
-    // Move shelf
-    animateShelf(delta);
+// Track coins on shelf
+function updateShelfAndCoins() {
+  // Move shelf
+  shelfBody.position.z += shelfDirection * shelfSpeed * 0.1;
+  if (shelfBody.position.z > 2 || shelfBody.position.z < -2) {
+    shelfDirection *= -1;
   }
 
-  renderer.render(scene, camera);
-  lastTime = time;
+  // Sync THREE mesh
+  shelfMesh.position.copy(shelfBody.position);
+  shelfMesh.quaternion.copy(shelfBody.quaternion);
+
+  // Check if coins are on top of the shelf
+  coins.forEach(({ body }) => {
+    const relativeY = body.position.y - shelfBody.position.y;
+    if (relativeY > 0 && relativeY < 1) {
+      // Apply shelf movement to coin
+      body.velocity.z += shelfDirection * shelfSpeed * 0.05;
+    }
+  });
 }
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+
+  world.step(1 / 60);
+
+  // Update shelf + coins on top
+  updateShelfAndCoins();
+
+  // Update coin meshes
+  coins.forEach(({ mesh, body }) => {
+    mesh.position.copy(body.position);
+    mesh.quaternion.copy(body.quaternion);
+  });
+
+  renderer.render(scene, camera);
+}
+
+camera.position.set(0, 0, 15);
 animate();
