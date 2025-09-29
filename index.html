@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Coin Aura</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div id="score">Score: 0</div>
-    <button id="dropBtn">Drop Coin</button>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coin Aura</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Load Three.js and Cannon.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <button id="dropBtn">Drop Coin</button>
 
-    <!-- Load our script as a module -->
-    <script type="module" src="./script.js"></script>
-  </body>
+  <!-- Load your main script -->
+  <script src="script.js"></script>
+</body>
 </html>
