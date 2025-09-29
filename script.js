@@ -6,20 +6,20 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a1a);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-// Camera slightly above and pulled back
-camera.position.set(0, 15, 25);
-camera.lookAt(0, 5, 0);
+// Camera pulled back and slightly above
+camera.position.set(0, 20, 35);
+camera.lookAt(0, 7, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambientLight);
 
 const spotLight = new THREE.SpotLight(0xffffff, 1.2);
-spotLight.position.set(20, 40, 20);
+spotLight.position.set(20, 50, 30);
 spotLight.castShadow = true;
 scene.add(spotLight);
 
@@ -27,10 +27,9 @@ scene.add(spotLight);
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0),
 });
-world.solver.iterations = 20;
 
-// Cabinet walls
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x5c3d2e });
+// Cabinet walls (brighter brown so visible)
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
 
 function createWall(w, h, d, x, y, z) {
   const geo = new THREE.BoxGeometry(w, h, d);
@@ -47,7 +46,7 @@ createWall(20, 1, 20, 0, 0, 0);
 createWall(1, 15, 20, -10, 7.5, 0);
 createWall(1, 15, 20, 10, 7.5, 0);
 
-// Back wall (higher for neon sign later)
+// Back wall
 createWall(20, 20, 1, 0, 10, -10);
 
 // Moving shelf (orange)
@@ -61,7 +60,7 @@ scene.add(shelf);
 const debugGeometry = new THREE.BoxGeometry(2, 2, 2);
 const debugMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xaa0000 });
 const debugCube = new THREE.Mesh(debugGeometry, debugMaterial);
-debugCube.position.set(0, 5, 6);
+debugCube.position.set(0, 5, 2);
 scene.add(debugCube);
 
 const debugLight = new THREE.PointLight(0xff0000, 2, 50);
