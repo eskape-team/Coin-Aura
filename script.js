@@ -1,9 +1,8 @@
-// Import Three.js
+// script.js
 import * as THREE from './three.module.js';
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x071022); // dark blue background
 
 // Camera
 const camera = new THREE.PerspectiveCamera(
@@ -12,80 +11,50 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(0, 5, 15);
-camera.lookAt(0, 0, 0);
+camera.position.set(0, 2, 8); // pull back so we see the cabinet
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById("container").appendChild(renderer.domElement);
+document.body.appendChild(renderer.domElement);
 
 // Lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(5, 10, 7.5);
+scene.add(directionalLight);
 
-const pointLight = new THREE.PointLight(0xffffff, 1);
-pointLight.position.set(5, 10, 10);
-scene.add(pointLight);
+// Cabinet function
+function createCabinet() {
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xff0000, // 🔴 bright red
+    wireframe: true, // outlines so we can SEE it
+  });
 
-// ----- Cabinet -----
-const cabinetGroup = new THREE.Group();
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff }); // bright white
+  // Left wall
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5, 5), material);
+  leftWall.position.x = -3;
+  scene.add(leftWall);
 
-// Floor
-const floor = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 8), wallMaterial);
-floor.position.y = -2;
-cabinetGroup.add(floor);
+  // Right wall
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5, 5), material);
+  rightWall.position.x = 3;
+  scene.add(rightWall);
 
-// Back wall
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 0.5), wallMaterial);
-backWall.position.set(0, 1, -4);
-cabinetGroup.add(backWall);
+  // Back wall
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(6, 5, 1), material);
+  backWall.position.z = -2.5;
+  scene.add(backWall);
 
-// Left wall
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 8), wallMaterial);
-leftWall.position.set(-4, 1, 0);
-cabinetGroup.add(leftWall);
-
-// Right wall
-const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 8), wallMaterial);
-rightWall.position.set(4, 1, 0);
-cabinetGroup.add(rightWall);
-
-// Front barrier
-const frontBarrier = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 0.5), wallMaterial);
-frontBarrier.position.set(0, -1.5, 4);
-cabinetGroup.add(frontBarrier);
-
-scene.add(cabinetGroup);
-
-// ----- Coin dropping -----
-let score = 0;
-const scoreElement = document.getElementById("score");
-
-function dropCoin() {
-  const coin = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32),
-    new THREE.MeshStandardMaterial({ color: 0xffd700 })
-  );
-
-  coin.position.set(0, 5, 0);
-  scene.add(coin);
-
-  let speed = 0.05;
-  function fall() {
-    if (coin.position.y > -1.5) {
-      coin.position.y -= speed;
-      requestAnimationFrame(fall);
-    } else {
-      score++;
-      scoreElement.innerText = "Score: " + score;
-    }
-  }
-  fall();
+  // Floor
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 5), material);
+  floor.position.y = -2.5;
+  scene.add(floor);
 }
 
-document.getElementById("dropBtn").addEventListener("click", dropCoin);
+// Call cabinet
+createCabinet();
 
 // Animation loop
 function animate() {
@@ -94,8 +63,8 @@ function animate() {
 }
 animate();
 
-// Resize handling
-window.addEventListener("resize", () => {
+// Resize handler
+window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
