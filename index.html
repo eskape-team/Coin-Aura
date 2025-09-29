@@ -1,18 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coin Aura</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coin Pusher</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="score">Score: 0</div>
-  <button id="dropBtn">Drop Coin</button>
-
-  <!-- 👇 Add this container for Three.js to render into -->
+  <div id="topbar">Score: <span id="score">0</span></div>
   <div id="container"></div>
 
+  <button id="dropBtn">Drop Coin</button>
+
+  <!-- Main script as a module (imports three + cannon-es by URL) -->
   <script type="module" src="./script.js"></script>
 </body>
 </html>
