@@ -55,9 +55,9 @@ function makeWall(w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) {
   world.addBody(body);
 }
 
-// Cabinet walls
+// Cabinet walls (moved outward so they’re visible)
 makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, -CABINET_DEPTH / 2); // back
-makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, CABINET_DEPTH / 2);  // front
+makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, CABINET_DEPTH / 2 + 0.1);  // front (slightly forward)
 makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, -CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0); // left
 makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0);  // right
 makeWall(CABINET_WIDTH, 0.2, CABINET_DEPTH, 0, 0, 0);                                   // bottom
@@ -65,7 +65,7 @@ makeWall(CABINET_WIDTH, 0.2, CABINET_DEPTH, 0, 0, 0);                           
 // ================== Moving Shelf ==================
 const SHELF_Y = 1.2;
 
-const shelfGeom = new THREE.BoxGeometry(4.5, 0.2, 3); // extended length
+const shelfGeom = new THREE.BoxGeometry(4.5, 0.2, 3);
 const shelfMatVis = new THREE.MeshStandardMaterial({ color: 0x0000ff });
 const shelfMesh = new THREE.Mesh(shelfGeom, shelfMatVis);
 shelfMesh.position.set(0, SHELF_Y, 0);
