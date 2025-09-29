@@ -1,6 +1,5 @@
 // script.js
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as CANNON from 'cannon-es';
 
 let scene, camera, renderer, world;
@@ -18,7 +17,7 @@ function init() {
 
   // Camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 5, 12);
+  camera.position.set(0, 6, 14);
 
   // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -31,32 +30,27 @@ function init() {
   scene.add(light);
 
   // Physics world
-  world = new CANNON.World({
-    gravity: new CANNON.Vec3(0, -9.82, 0)
-  });
+  world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
 
-  // Cabinet walls
+  // Cabinet dimensions
   const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x555555, side: THREE.DoubleSide });
   const wallPhysics = new CANNON.Material();
-
   const thickness = 0.5;
   const innerWidth = 8;
   const innerDepth = 10;
   const innerHeight = 8;
 
-  // Left wall
-  addWall(-innerWidth / 2 - thickness / 2, innerHeight / 2 - 2, 0, thickness, innerHeight, innerDepth, wallMaterial, wallPhysics);
-  // Right wall
-  addWall(innerWidth / 2 + thickness / 2, innerHeight / 2 - 2, 0, thickness, innerHeight, innerDepth, wallMaterial, wallPhysics);
-  // Back wall
-  addWall(0, innerHeight / 2 - 2, -innerDepth / 2 - thickness / 2, innerWidth, innerHeight, thickness, wallMaterial, wallPhysics);
-  // Floor
-  addWall(0, -thickness / 2, 0, innerWidth, thickness, innerDepth, wallMaterial, wallPhysics);
+  // Cabinet walls
+  addWall(-innerWidth / 2 - thickness / 2, innerHeight / 2 - 2, 0, thickness, innerHeight, innerDepth, wallMaterial, wallPhysics); // left
+  addWall(innerWidth / 2 + thickness / 2, innerHeight / 2 - 2, 0, thickness, innerHeight, innerDepth, wallMaterial, wallPhysics);  // right
+  addWall(0, innerHeight / 2 - 2, -innerDepth / 2 - thickness / 2, innerWidth, innerHeight, thickness, wallMaterial, wallPhysics); // back
+  addWall(0, -thickness / 2, 0, innerWidth, thickness, innerDepth, wallMaterial, wallPhysics); // floor
 
-  // Moving shelf (width = full cabinet inside width)
+  // Moving shelf (now matches inside cabinet width, no gaps)
   const shelfGeometry = new THREE.BoxGeometry(innerWidth, 0.5, innerDepth / 2);
   const shelfMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
   shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
+  shelf.position.set(0, 0.25, 0);
   scene.add(shelf);
 
   const shelfShape = new CANNON.Box(new CANNON.Vec3(innerWidth / 2, 0.25, innerDepth / 4));
@@ -125,28 +119,27 @@ function dropCoin() {
   const coinMesh = new THREE.Mesh(geometry, material);
   scene.add(coinMesh);
 
-  // Physics body → approximated with stacked spheres
+  // Physics coin
+  const coinShape = new CANNON.Cylinder(radius, radius, thickness, 16);
   const coinBody = new CANNON.Body({
     mass: 1,
     position: new CANNON.Vec3(0, 5, 0),
-    shape: new CANNON.Cylinder(radius, radius, thickness, 16),
+    shape: coinShape
   });
-
   world.addBody(coinBody);
+
   coins.push({ mesh: coinMesh, body: coinBody });
 }
 
 function animate() {
   requestAnimationFrame(animate);
-
   world.step(1 / 60);
 
-  // Move shelf back and forth
+  // Shelf movement
   const time = Date.now() * 0.001;
-  const amplitude = 1.5; // how far it moves
-  const speed = 1; // speed (kept same as before)
+  const amplitude = 1.5;
+  const speed = 1;
   const offset = Math.sin(time * speed) * amplitude;
-
   shelf.position.z = offset;
   shelfBody.position.z = offset;
 
