@@ -14,15 +14,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 dirLight.position.set(5, 10, 7);
 scene.add(dirLight);
 
 // Cabinet dimensions
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, transparent: true, opacity: 0.8 });
 const thickness = 0.3;
 const width = 6;
 const depth = 10;
@@ -48,19 +48,17 @@ const rightWall = new THREE.Mesh(new THREE.BoxGeometry(thickness, height, depth)
 rightWall.position.set(width / 2, height / 2, 0);
 scene.add(rightWall);
 
-// Front (open for coins to fall out, no wall here)
-
 // Pusher shelf
-const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x8888ff });
-const shelf = new THREE.Mesh(new THREE.BoxGeometry(width - 0.5, 0.5, depth / 2), shelfMaterial);
-shelf.position.set(0, 0.25, -depth / 4); // Start near back
+const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff }); // bright blue
+const shelf = new THREE.Mesh(new THREE.BoxGeometry(width - 0.5, 0.4, depth / 2), shelfMaterial);
+shelf.position.set(0, 0.5, -depth / 4); // raised above floor
 scene.add(shelf);
 
 // Shelf movement
-let shelfSpeed = 0.05;
+let shelfSpeed = 0.1; // faster for visibility
 function moveShelf() {
   shelf.position.z += shelfSpeed;
-  if (shelf.position.z > 0 || shelf.position.z < -depth / 2 + 0.5) {
+  if (shelf.position.z > 1 || shelf.position.z < -depth / 2 + 1) {
     shelfSpeed *= -1; // reverse direction
   }
 }
@@ -92,25 +90,25 @@ function animate() {
   // Move shelf
   moveShelf();
 
-  // Gravity + collisions
+  // Gravity + pushing
   coins.forEach((coin) => {
-    if (coin.position.y > 0.1) {
-      coin.position.y -= 0.05; // fall down
+    if (coin.position.y > 0.15) {
+      coin.position.y -= 0.05; // fall
     } else {
-      coin.position.y = 0.1; // land on floor or shelf
+      coin.position.y = 0.15; // rest
     }
 
-    // Simple interaction with moving shelf
+    // Push coins with shelf
     if (
-      coin.position.y <= shelf.position.y + 0.5 &&
+      coin.position.y <= shelf.position.y + 0.3 &&
       coin.position.y > shelf.position.y &&
       coin.position.z < shelf.position.z + depth / 4 &&
       coin.position.z > shelf.position.z - depth / 4
     ) {
-      coin.position.z += shelfSpeed * 0.5; // push coin along with shelf
+      coin.position.z += shelfSpeed * 0.6; // shelf pushes coin
     }
 
-    // Check if coin falls out front
+    // Score if coin falls out
     if (coin.position.z > depth / 2) {
       score++;
       updateScore();
