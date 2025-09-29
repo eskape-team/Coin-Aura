@@ -1,185 +1,224 @@
+// script.js
+// Replace the whole file with this. Assumes these files exist in your repo:
+// - ./three.module.js
+// - ./cannon-es.js
+// index.html should have <button id="dropBtn">Drop Coin</button> and <script type="module" src="./script.js"></script>
+
 import * as THREE from './three.module.js';
 import * as CANNON from './cannon-es.js';
 
-// ----- SCENE -----
+// ---------- THREE setup ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0d1a);
+scene.background = new THREE.Color(0x071022);
 
-// ----- CAMERA -----
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 5, 12);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 4.5, 12);
 camera.lookAt(0, 2, 0);
 
-// ----- RENDERER -----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ----- PHYSICS WORLD -----
-const world = new CANNON.World();
-world.gravity.set(0, -9.82, 0);
+// lights
+const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambient);
+const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+dir.position.set(5, 10, 5);
+scene.add(dir);
 
-const defaultMat = new CANNON.Material('default');
-const contactMat = new CANNON.ContactMaterial(defaultMat, defaultMat, {
-  friction: 0.3,
-  restitution: 0.1
+// ---------- CANNON setup ----------
+const world = new CANNON.World({
+  gravity: new CANNON.Vec3(0, -9.82, 0),
 });
-world.addContactMaterial(contactMat);
+world.broadphase = new CANNON.NaiveBroadphase();
+world.solver.iterations = 10;
 
-// ----- LIGHTING -----
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-dirLight.position.set(10, 10, 5);
-scene.add(dirLight);
+// materials & contact
+const defaultMat = new CANNON.Material('default');
+const coinMat = new CANNON.Material('coin');
+const shelfMat = new CANNON.Material('shelf');
 
-// ----- CABINET -----
-const wallMat = new THREE.MeshPhongMaterial({ color: 0x444444, side: THREE.DoubleSide });
-const wallThickness = 0.2;
-const cabinetWidth = 6;
-const cabinetDepth = 10;
-const cabinetHeight = 6;
+world.defaultContactMaterial = new CANNON.ContactMaterial(defaultMat, defaultMat, {
+  friction: 0.3,
+  restitution: 0.0,
+});
+// coin <> shelf: high friction so coins move with shelf
+world.addContactMaterial(new CANNON.ContactMaterial(coinMat, shelfMat, {
+  friction: 0.95,
+  restitution: 0.0
+}));
 
-// Helper to make wall mesh + physics
-function makeWall(width, height, depth, x, y, z) {
-  const geo = new THREE.BoxGeometry(width, height, depth);
-  const mesh = new THREE.Mesh(geo, wallMat);
-  mesh.position.set(x, y, z);
+// arrays to track meshes <> bodies
+const coinPool = []; // elements: {mesh, body}
+
+// ---------- Helpers ----------
+function threeBox(size, pos, color = 0x666666, opacity = 0.85) {
+  const g = new THREE.BoxGeometry(size.x, size.y, size.z);
+  const m = new THREE.MeshStandardMaterial({ color, transparent: true, opacity });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.copy(pos);
   scene.add(mesh);
-
-  const body = new CANNON.Body({
-    mass: 0,
-    shape: new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2)),
-    position: new CANNON.Vec3(x, y, z),
-    material: defaultMat
-  });
-  world.addBody(body);
-  return { mesh, body };
+  return mesh;
 }
 
-// Back wall
-makeWall(cabinetWidth, cabinetHeight, wallThickness, 0, cabinetHeight / 2, -cabinetDepth / 2);
-// Left wall
-makeWall(wallThickness, cabinetHeight, cabinetDepth, -cabinetWidth / 2, cabinetHeight / 2, 0);
-// Right wall
-makeWall(wallThickness, cabinetHeight, cabinetDepth, cabinetWidth / 2, cabinetHeight / 2, 0);
-// Floor
-makeWall(cabinetWidth, wallThickness, cabinetDepth, 0, 0, 0);
+function cannonBox(size, pos, quat = null, mass = 0) {
+  const shape = new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2));
+  const body = new CANNON.Body({ mass, shape });
+  body.position.set(pos.x, pos.y, pos.z);
+  if (quat) body.quaternion.copy(quat);
+  world.addBody(body);
+  return body;
+}
 
-// ----- SHELF -----
-const shelfColor = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-const shelfWidth = 5.5;
-const shelfDepth = 3;
-const shelfHeight = 0.3;
+// ---------- Cabinet (floor + walls) ----------
+const CAB_W = 8, CAB_H = 8, CAB_D = 8;
+const floorY = 0; // world y=0 is floor
+// floor (thin)
+threeBox(new THREE.Vector3(CAB_W, 0.4, CAB_D), new THREE.Vector3(0, floorY - 0.2, 0), 0x222222, 1);
+cannonBox(new THREE.Vector3(CAB_W, 0.4, CAB_D), new THREE.Vector3(0, floorY - 0.2, 0), null, 0);
 
-const shelfGeo = new THREE.BoxGeometry(shelfWidth, shelfHeight, shelfDepth);
-const shelf = new THREE.Mesh(shelfGeo, shelfColor);
-shelf.position.set(0, 1, -2);
-scene.add(shelf);
+// back wall
+threeBox(new THREE.Vector3(CAB_W, CAB_H, 0.4), new THREE.Vector3(0, CAB_H / 2 - 0.2, -CAB_D / 2 + 0.2), 0x4b4b4b, 0.95);
+cannonBox(new THREE.Vector3(CAB_W, CAB_H, 0.4), new THREE.Vector3(0, CAB_H / 2 - 0.2, -CAB_D / 2 + 0.2), null, 0);
 
-const shelfBody = new CANNON.Body({
-  mass: 0,
-  shape: new CANNON.Box(new CANNON.Vec3(shelfWidth / 2, shelfHeight / 2, shelfDepth / 2)),
-  position: new CANNON.Vec3(0, 1, -2),
-  material: defaultMat
-});
+// left/right walls
+threeBox(new THREE.Vector3(0.4, CAB_H, CAB_D), new THREE.Vector3(-CAB_W / 2 + 0.2, CAB_H / 2 - 0.2, 0), 0x4b4b4b, 0.95);
+cannonBox(new THREE.Vector3(0.4, CAB_H, CAB_D), new THREE.Vector3(-CAB_W / 2 + 0.2, CAB_H / 2 - 0.2, 0), null, 0);
+threeBox(new THREE.Vector3(0.4, CAB_H, CAB_D), new THREE.Vector3(CAB_W / 2 - 0.2, CAB_H / 2 - 0.2, 0), 0x4b4b4b, 0.95);
+cannonBox(new THREE.Vector3(0.4, CAB_H, CAB_D), new THREE.Vector3(CAB_W / 2 - 0.2, CAB_H / 2 - 0.2, 0), null, 0);
+
+// front lip (so shelf doesn't fall through front)
+threeBox(new THREE.Vector3(CAB_W, 0.4, 0.6), new THREE.Vector3(0, 0.2, CAB_D / 2 - 0.3), 0x333333, 1);
+cannonBox(new THREE.Vector3(CAB_W, 0.4, 0.6), new THREE.Vector3(0, 0.2, CAB_D / 2 - 0.3), null, 0);
+
+// ---------- Moving shelf (kinematic) ----------
+const SHELF_W = 5.2;        // x-size (width)
+const SHELF_TH = 0.45;      // y-size (thickness)
+const SHELF_DEPTH = 6.0;    // z-size: made longer to block coins (user request)
+const shelfGeo = new THREE.BoxGeometry(SHELF_W, SHELF_TH, SHELF_DEPTH);
+const shelfMatThree = new THREE.MeshStandardMaterial({ color: 0x1133ff });
+const shelfMesh = new THREE.Mesh(shelfGeo, shelfMatThree);
+
+// place shelf inside cabinet (centered front/back-ish)
+const SHELF_Y = 1.6;
+const SHELF_Z_INITIAL = -1.0; // negative z = closer to back; positive = toward front
+shelfMesh.position.set(0, SHELF_Y, SHELF_Z_INITIAL);
+scene.add(shelfMesh);
+
+// cannon kinematic body
+const shelfShape = new CANNON.Box(new CANNON.Vec3(SHELF_W / 2, SHELF_TH / 2, SHELF_DEPTH / 2));
+const shelfBody = new CANNON.Body({ mass: 0 }); // mass 0 but we'll mark kinematic
+shelfBody.addShape(shelfShape);
+shelfBody.position.set(shelfMesh.position.x, shelfMesh.position.y, shelfMesh.position.z);
+shelfBody.type = CANNON.Body.KINEMATIC;
+shelfBody.collisionResponse = true;
 world.addBody(shelfBody);
 
-// Invisible back extension
-const backExt = new CANNON.Body({
-  mass: 0,
-  shape: new CANNON.Box(new CANNON.Vec3(shelfWidth / 2, shelfHeight / 2, 1)),
-  position: new CANNON.Vec3(0, 1, -2 - shelfDepth / 2 - 1),
-  material: defaultMat
-});
-world.addBody(backExt);
-
-// Shelf motion
+// shelf motion parameters
 let shelfDir = 1;
-const shelfSpeed = 0.5;
-const shelfRange = 2;
-const shelfStartZ = -2;
+let shelfSpeed = 0.9;         // changeable - user asked slower, set < 1.0
+const zMin = -1.6;            // back-most (closer to back wall)
+const zMax = 1.6;             // front-most (closer to front lip)
+shelfBody.velocity.set(0, 0, shelfSpeed * shelfDir);
 
-// ----- COINS -----
-const coins = [];
-const coinBodies = [];
-const coinRadius = 0.3;
-const coinThickness = 0.1;
-const coinGeo = new THREE.CylinderGeometry(coinRadius, coinRadius, coinThickness, 32);
-const coinMat = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+// ---------- Ground contact shape for coins if they fall off ----------
+const groundShape = new CANNON.Plane();
+const groundBody = new CANNON.Body({ mass: 0 });
+groundBody.addShape(groundShape);
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+groundBody.position.set(0, -0.5, 0);
+world.addBody(groundBody);
 
+// ---------- Coin drop function ----------
 function dropCoin() {
-  const coin = new THREE.Mesh(coinGeo, coinMat);
-  coin.position.set(0, 5, -2);
-  scene.add(coin);
+  const r = 0.28;
+  const h = 0.12;
+  // THREE mesh
+  const geom = new THREE.CylinderGeometry(r, r, h, 32);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.rotation.x = Math.PI / 2; // make it lie flat visually
+  // spawn a bit above the shelf center; small random x offset so coins stack realistically
+  const spawnX = (Math.random() - 0.5) * 1.2;
+  const spawnZ = shelfMesh.position.z - 0.2; // drop near middle of shelf
+  mesh.position.set(spawnX, SHELF_Y + 3.2, spawnZ);
+  scene.add(mesh);
 
-  const coinBody = new CANNON.Body({
-    mass: 0.2,
-    shape: new CANNON.Cylinder(coinRadius, coinRadius, coinThickness, 16),
-    position: new CANNON.Vec3(0, 5, -2),
-    material: defaultMat
-  });
-  coinBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+  // CANNON body (cylinder shape rotated so axis = y)
+  const cylShape = new CANNON.Cylinder(r, r, h, 16);
+  const coinBody = new CANNON.Body({ mass: 0.55, material: coinMat });
+  const q = new CANNON.Quaternion();
+  q.setFromEuler(Math.PI / 2, 0, 0); // rotate shape to lay flat
+  coinBody.addShape(cylShape, new CANNON.Vec3(), q);
+  coinBody.position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+  // give a little spin
+  coinBody.angularVelocity.set(0, 1.5 * (Math.random() - 0.5), 0.5 * (Math.random() - 0.5));
+  coinBody.angularDamping = 0.4;
+
   world.addBody(coinBody);
-
-  coins.push(coin);
-  coinBodies.push(coinBody);
+  coinPool.push({ mesh, body: coinBody });
 }
 
-// ----- BUTTON -----
-const dropBtn = document.createElement('button');
-dropBtn.textContent = 'Drop Coin';
-dropBtn.style.position = 'absolute';
-dropBtn.style.bottom = '20px';
-dropBtn.style.left = '50%';
-dropBtn.style.transform = 'translateX(-50%)';
-dropBtn.style.padding = '10px 20px';
-dropBtn.style.fontSize = '18px';
-dropBtn.style.background = 'green';
-dropBtn.style.color = 'white';
-dropBtn.style.border = 'none';
-dropBtn.style.borderRadius = '5px';
-dropBtn.style.cursor = 'pointer';
-document.body.appendChild(dropBtn);
-dropBtn.addEventListener('click', dropCoin);
+// bind the button (index.html uses id "dropBtn" in your screenshots)
+const dropBtn = document.getElementById('dropBtn');
+if (dropBtn) {
+  dropBtn.addEventListener('click', dropCoin);
+} else {
+  console.warn('Drop button (#dropBtn) not found in DOM.');
+}
 
-// ----- LOOP -----
-const clock = new THREE.Clock();
+// ---------- sync loop ----------
+const FIXED_STEP = 1 / 60;
+let lastTime = undefined;
 
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = clock.getDelta();
-  world.step(1 / 60, delta, 3);
-
-  // Move shelf
-  shelfBody.position.z += shelfDir * shelfSpeed * delta;
-  if (shelfBody.position.z > shelfStartZ + shelfRange || shelfBody.position.z < shelfStartZ - shelfRange) {
-    shelfDir *= -1;
+function updatePhysics(dt) {
+  // Move kinematic shelf: set velocity & world.step will integrate it.
+  // If using instantaneous position changes you'd break collisions; using velocity allows collision impulses.
+  if (shelfBody.position.z > zMax) {
+    shelfDir = -1;
+    shelfBody.velocity.set(0, 0, shelfSpeed * shelfDir);
+  } else if (shelfBody.position.z < zMin) {
+    shelfDir = 1;
+    shelfBody.velocity.set(0, 0, shelfSpeed * shelfDir);
   }
-  shelf.position.copy(shelfBody.position);
-  shelf.quaternion.copy(shelfBody.quaternion);
+  // Step world
+  world.step(FIXED_STEP, dt, 3);
+}
 
-  // Move invisible extension
-  backExt.position.z = shelfBody.position.z - shelfDepth / 2 - 1;
+function renderLoop(time) {
+  requestAnimationFrame(renderLoop);
+  const t = time / 1000;
+  const dt = lastTime ? t - lastTime : FIXED_STEP;
+  lastTime = t;
 
-  // Coins
-  coinBodies.forEach((coinBody, i) => {
-    const coin = coins[i];
-    coin.position.copy(coinBody.position);
-    coin.quaternion.copy(coinBody.quaternion);
+  // update physics
+  updatePhysics(dt);
 
-    // If coin is sitting on shelf, apply motion
-    if (Math.abs(coinBody.position.y - shelfBody.position.y) < 0.5) {
-      coinBody.velocity.z += shelfDir * shelfSpeed * 0.05;
-    }
-  });
+  // sync THREE meshes to CANNON bodies
+  // shelf
+  shelfMesh.position.copy(shelfBody.position);
+  shelfMesh.quaternion.copy(shelfBody.quaternion);
+
+  // coins
+  for (let i = 0; i < coinPool.length; i++) {
+    const c = coinPool[i];
+    c.mesh.position.copy(c.body.position);
+    c.mesh.quaternion.copy(c.body.quaternion);
+  }
 
   renderer.render(scene, camera);
 }
-animate();
 
-// ----- RESIZE -----
+renderLoop();
+
+// ---------- resize handling ----------
 window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// ---------- debug helper (optional) ----------
+// If you want to debug in-browser, you can enable a wireframe for bodies or print positions to console.
+// (Left out to keep runtime tidy.)
