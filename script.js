@@ -1,149 +1,245 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js';
+// script.js - full, self-contained example
+import * as THREE from 'https://unpkg.com/three@0.152.0/build/three.module.js';
 import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
 
-// Scene setup
+// ----- Scene setup -----
+const container = document.getElementById('container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a1a);
+scene.background = new THREE.Color(0x071022);
 
-// Camera setup
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 5, 15);
+const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+camera.position.set(0, 2.2, 4); // pulled back so cabinet is visible
+camera.lookAt(0, 0.6, 0);
 
-// Renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
 
-// OrbitControls
-const controls = new OrbitControls(camera, renderer.domElement);
-
-// Cannon world
-const world = new CANNON.World();
-world.gravity.set(0, -9.82, 0);
-
-// Materials
-const defaultMaterial = new CANNON.Material('default');
-world.addContactMaterial(new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
-  friction: 0.3,
-  restitution: 0.2,
-}));
-
-// Cabinet dimensions
-const cabinetWidth = 10;
-const cabinetHeight = 10;
-const cabinetDepth = 10;
-const thickness = 0.5;
-const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x444444, side: THREE.FrontSide });
-
-// Floor
-const floor = new THREE.Mesh(new THREE.BoxGeometry(cabinetWidth, thickness, cabinetDepth), wallMaterial);
-floor.position.set(0, -thickness / 2, 0);
-scene.add(floor);
-
-// Back wall
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(cabinetWidth, cabinetHeight, thickness), wallMaterial);
-backWall.position.set(0, cabinetHeight / 2 - thickness / 2, -cabinetDepth / 2);
-scene.add(backWall);
-
-// Left wall
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(thickness, cabinetHeight, cabinetDepth), wallMaterial);
-leftWall.position.set(-cabinetWidth / 2, cabinetHeight / 2 - thickness / 2, 0);
-scene.add(leftWall);
-
-// Right wall
-const rightWall = new THREE.Mesh(new THREE.BoxGeometry(thickness, cabinetHeight, cabinetDepth), wallMaterial);
-rightWall.position.set(cabinetWidth / 2, cabinetHeight / 2 - thickness / 2, 0);
-scene.add(rightWall);
-
-// Moving shelf (slightly wider than cabinet to avoid gaps)
-const shelfThickness = 0.5;
-const shelf = new THREE.Mesh(
-  new THREE.BoxGeometry(cabinetWidth + 2, shelfThickness, cabinetDepth * 0.6),
-  new THREE.MeshBasicMaterial({ color: 0x0000ff })
-);
-shelf.position.set(0, 3, 0);
-scene.add(shelf);
-
-// Shelf physics
-const shelfBody = new CANNON.Body({ mass: 0, material: defaultMaterial });
-shelfBody.addShape(new CANNON.Box(new CANNON.Vec3((cabinetWidth + 2) / 2, shelfThickness / 2, (cabinetDepth * 0.6) / 2)));
-shelfBody.position.copy(shelf.position);
-world.addBody(shelfBody);
-
-let shelfDirection = 1;
-const shelfSpeed = 2;
-
-// Coin setup
-const coins = [];
-const coinBodies = [];
-const coinGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32);
-const coinMaterial = new THREE.MeshBasicMaterial({ color: 0xffd700 });
-
-// Drop Coin button
-const button = document.createElement('button');
-button.innerText = 'Drop Coin';
-button.style.position = 'absolute';
-button.style.bottom = '20px';
-button.style.left = '50%';
-button.style.transform = 'translateX(-50%)';
-button.style.padding = '10px 20px';
-button.style.fontSize = '16px';
-button.style.backgroundColor = 'green';
-button.style.color = 'white';
-document.body.appendChild(button);
-
-button.addEventListener('click', () => {
-  const coin = new THREE.Mesh(coinGeometry, coinMaterial);
-  coin.rotation.x = Math.PI / 2;
-  scene.add(coin);
-
-  const coinBody = new CANNON.Body({ mass: 1, material: defaultMaterial });
-  coinBody.addShape(new CANNON.Cylinder(0.5, 0.5, 0.1, 32));
-  coinBody.position.set(0, 8, 0);
-  coinBody.quaternion.setFromEuler(Math.PI / 2, 0, 0);
-  world.addBody(coinBody);
-
-  coins.push(coin);
-  coinBodies.push(coinBody);
+window.addEventListener('resize', () => {
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
 });
 
-// Score
-let score = 0;
-const scoreEl = document.createElement('div');
-scoreEl.innerText = `Score: ${score}`;
-scoreEl.style.position = 'absolute';
-scoreEl.style.top = '10px';
-scoreEl.style.left = '10px';
-scoreEl.style.color = 'white';
-scoreEl.style.fontSize = '20px';
-document.body.appendChild(scoreEl);
+// lighting
+const amb = new THREE.AmbientLight(0xffffff, 0.45);
+scene.add(amb);
+const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+dir.position.set(4, 6, 2);
+scene.add(dir);
 
-// Animation loop
-const clock = new THREE.Clock();
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = clock.getDelta();
-  world.step(1 / 60, delta, 3);
+// ----- Physics (cannon-es) -----
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
 
-  // Shelf movement
-  shelfBody.position.x += shelfDirection * shelfSpeed * delta;
-  if (shelfBody.position.x > 3 || shelfBody.position.x < -3) shelfDirection *= -1;
-  shelf.position.copy(shelfBody.position);
+// materials
+const defaultMat = new CANNON.Material('default');
+const contactMat = new CANNON.ContactMaterial(defaultMat, defaultMat, { friction: 0.4, restitution: 0.1 });
+world.addContactMaterial(contactMat);
 
-  // Sync coins
-  coins.forEach((coin, i) => {
-    coin.position.copy(coinBodies[i].position);
-    coin.quaternion.copy(coinBodies[i].quaternion);
+// helper to sync three mesh with cannon body
+function syncMesh(body, mesh) {
+  mesh.position.copy(body.position);
+  mesh.quaternion.copy(body.quaternion);
+}
+
+// ----- Cabinet (walls + floor + back) -----
+// Dimensions (units tuned for mobile view)
+const cabinet = {
+  innerWidth: 2.4,
+  innerHeight: 2.0,
+  innerDepth: 2.2,
+  wallThickness: 0.12
+};
+
+// Colors / materials
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, opacity: 0.95, transparent: false });
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+
+// Floor (visual)
+const floorGeo = new THREE.BoxGeometry(cabinet.innerWidth + 0.6, cabinet.wallThickness, cabinet.innerDepth + 0.6);
+const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+floorMesh.position.set(0, -cabinet.wallThickness / 2, 0.15);
+scene.add(floorMesh);
+
+// Floor (physics) - static
+const floorBody = new CANNON.Body({
+  type: CANNON.Body.STATIC,
+  shape: new CANNON.Box(new CANNON.Vec3((cabinet.innerWidth + 0.6)/2, cabinet.wallThickness/2, (cabinet.innerDepth + 0.6)/2)),
+  position: new CANNON.Vec3(0, -cabinet.wallThickness/2, 0.15),
+});
+world.addBody(floorBody);
+
+// Back wall (visual + physics)
+const backGeo = new THREE.BoxGeometry(cabinet.innerWidth + 0.6, cabinet.innerHeight + 0.6, cabinet.wallThickness);
+const backMesh = new THREE.Mesh(backGeo, wallMat);
+backMesh.position.set(0, cabinet.innerHeight/2 - 0.1, -(cabinet.innerDepth/2) + 0.15);
+scene.add(backMesh);
+
+const backBody = new CANNON.Body({
+  type: CANNON.Body.STATIC,
+  shape: new CANNON.Box(new CANNON.Vec3((cabinet.innerWidth + 0.6)/2, (cabinet.innerHeight + 0.6)/2, cabinet.wallThickness/2)),
+  position: new CANNON.Vec3(0, cabinet.innerHeight/2 - 0.1, -(cabinet.innerDepth/2) + 0.15)
+});
+world.addBody(backBody);
+
+// Side walls (left + right)
+const sideGeo = new THREE.BoxGeometry(cabinet.wallThickness, cabinet.innerHeight + 0.6, cabinet.innerDepth + 0.6);
+const leftMesh = new THREE.Mesh(sideGeo, wallMat);
+const rightMesh = new THREE.Mesh(sideGeo, wallMat);
+leftMesh.position.set(-(cabinet.innerWidth/2 + cabinet.wallThickness/2) + 0.15, cabinet.innerHeight/2 - 0.1, 0);
+rightMesh.position.set((cabinet.innerWidth/2 + cabinet.wallThickness/2) - 0.15, cabinet.innerHeight/2 - 0.1, 0);
+scene.add(leftMesh, rightMesh);
+
+const leftBody = new CANNON.Body({
+  type:CANNON.Body.STATIC,
+  shape: new CANNON.Box(new CANNON.Vec3(cabinet.wallThickness/2, (cabinet.innerHeight + 0.6)/2, (cabinet.innerDepth + 0.6)/2)),
+  position: new CANNON.Vec3(-(cabinet.innerWidth/2 + cabinet.wallThickness/2) + 0.15, cabinet.innerHeight/2 - 0.1, 0)
+});
+const rightBody = leftBody.clone();
+rightBody.position = new CANNON.Vec3((cabinet.innerWidth/2 + cabinet.wallThickness/2) - 0.15, cabinet.innerHeight/2 - 0.1, 0);
+world.addBody(leftBody); world.addBody(rightBody);
+
+// Front is intentionally open (no front wall) so you can see inside.
+
+// ----- Moving shelf (kinematic) -----
+const shelfWidth = cabinet.innerWidth + 0.4;   // deliberately wider than inner cabinet to close side gaps
+const shelfDepth = 0.9;                        // how far the shelf reaches (extend toward the back)
+const shelfThickness = 0.12;
+const shelfY = 0.35; // height of shelf above floor
+
+const shelfGeo = new THREE.BoxGeometry(shelfWidth, shelfThickness, shelfDepth);
+const shelfMat = new THREE.MeshStandardMaterial({ color: 0x1536ff });
+const shelfMesh = new THREE.Mesh(shelfGeo, shelfMat);
+shelfMesh.position.set(0, shelfY, 0.2);
+scene.add(shelfMesh);
+
+// Kinematic body
+const shelfBody = new CANNON.Body({
+  mass: 0,
+  type: CANNON.Body.KINEMATIC,
+  shape: new CANNON.Box(new CANNON.Vec3(shelfWidth/2, shelfThickness/2, shelfDepth/2)),
+  position: new CANNON.Vec3(0, shelfY, 0.2)
+});
+world.addBody(shelfBody);
+
+// shelf oscillation parameters
+const shelfStartZ = 0.2;
+const shelfAmplitude = 0.45;   // how far forward/back from start
+const shelfSpeed = 1.2;        // speed multiplier
+let shelfTime = 0;
+
+// ----- coin factory -----
+const coins = []; // array of { body, mesh }
+
+function makeCoin(x=0, y=1.3, z=0) {
+  // coin dimensions
+  const radius = 0.14;
+  const thickness = 0.06;
+
+  // Three mesh
+  const geom = new THREE.CylinderGeometry(radius, radius, thickness, 24);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffd300, metalness: 0.3, roughness: 0.5 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.rotation.x = Math.PI / 2; // lay flat by default visually
+  scene.add(mesh);
+
+  // Cannon body (cylinder axis is X? We'll use sphere-ish compound for stable contact)
+  // A cylinder can be used, but using a few spheres stacked gives better rolling on simple shape
+  const body = new CANNON.Body({
+    mass: 0.12,
+    shape: new CANNON.Cylinder(radius, radius, thickness, 12),
+    position: new CANNON.Vec3(x, y, z),
+    material: defaultMat
   });
+  // Align orientation of cannon cylinder to match three (cannon cylinder axis is x by default):
+  const q = new CANNON.Quaternion();
+  q.setFromEuler(Math.PI / 2, 0, 0, 'XYZ');
+  body.quaternion.copy(q);
+
+  // slight damping so coins settle but still move with shelf
+  body.linearDamping = 0.12;
+  body.angularDamping = 0.8;
+  world.addBody(body);
+
+  coins.push({ body, mesh });
+  return { body, mesh };
+}
+
+// Drop coin button
+document.getElementById('dropBtn').addEventListener('click', () => {
+  // spawn coin slightly forward of camera, drop near center of shelf
+  const dropX = (Math.random() - 0.5) * 0.3;
+  const dropZ = shelfBody.position.z - 0.1; // drop slightly in front of shelf
+  makeCoin(dropX, shelfY + 1.2, dropZ);
+});
+
+// ----- simple camera controls (drag to rotate horizontally) -----
+let isPointerDown = false;
+let startX = 0, startY = 0, startCamRot = 0;
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  isPointerDown = true;
+  startX = e.clientX; startY = e.clientY;
+  startCamRot = camera.rotation.y;
+});
+window.addEventListener('pointerup', () => { isPointerDown = false; });
+window.addEventListener('pointermove', (e) => {
+  if (!isPointerDown) return;
+  const dx = (e.clientX - startX) / container.clientWidth;
+  camera.rotation.y = startCamRot - dx * 1.0;
+});
+
+// ----- animate loop: physics step + render -----
+const fixedTimeStep = 1 / 60;
+let lastTime;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+
+  // time in seconds
+  const t = time / 1000;
+  const dt = lastTime ? (t - lastTime) : fixedTimeStep;
+  lastTime = t;
+
+  // update shelf kinematic position (sinusoidal)
+  shelfTime += dt;
+  const targetZ = shelfStartZ + Math.sin(shelfTime * shelfSpeed) * shelfAmplitude;
+  // compute velocity to reach target (smooth)
+  const velZ = (targetZ - shelfBody.position.z) / Math.max(dt, 1/120);
+  shelfBody.velocity.set(0, 0, velZ);
+  // also keep shelf body exactly at desired Y and X (just in case)
+  shelfBody.position.x = 0;
+  shelfBody.position.y = shelfY;
+  // sync mesh
+  shelfMesh.position.copy(shelfBody.position);
+  shelfMesh.quaternion.copy(shelfBody.quaternion);
+
+  // step physics (cannon)
+  world.step(fixedTimeStep, dt, 3);
+
+  // sync coins
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.mesh.position.copy(c.body.position);
+    c.mesh.quaternion.copy(c.body.quaternion);
+
+    // very simple cleanup: if coin falls far below floor, remove it
+    if (c.body.position.y < -4) {
+      world.removeBody(c.body);
+      scene.remove(c.mesh);
+      coins.splice(i, 1);
+    }
+  }
 
   renderer.render(scene, camera);
 }
-animate();
 
-// Resize
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+requestAnimationFrame(animate);
+
+// ----- quick debug: make a few starter coins so you can see physics working -----
+for (let i = 0; i < 3; i++) {
+  makeCoin((i - 1) * 0.12, shelfY + 0.8 + i * 0.05, shelfBody.position.z - 0.1);
+}
