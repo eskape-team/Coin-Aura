@@ -6,9 +6,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a1a);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-// Camera pulled back and slightly above
 camera.position.set(0, 20, 35);
-camera.lookAt(0, 7, 0);
+camera.lookAt(0, 10, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -23,12 +22,7 @@ spotLight.position.set(20, 50, 30);
 spotLight.castShadow = true;
 scene.add(spotLight);
 
-// Physics world
-const world = new CANNON.World({
-  gravity: new CANNON.Vec3(0, -9.82, 0),
-});
-
-// Cabinet walls (brighter brown so visible)
+// Cabinet walls (taller)
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
 
 function createWall(w, h, d, x, y, z) {
@@ -42,30 +36,49 @@ function createWall(w, h, d, x, y, z) {
 // Floor
 createWall(20, 1, 20, 0, 0, 0);
 
-// Left + right walls
-createWall(1, 15, 20, -10, 7.5, 0);
-createWall(1, 15, 20, 10, 7.5, 0);
+// Left + right walls (taller)
+createWall(1, 20, 20, -10, 10, 0);
+createWall(1, 20, 20, 10, 10, 0);
 
-// Back wall
+// Back wall (taller)
 createWall(20, 20, 1, 0, 10, -10);
 
-// Moving shelf (orange)
+// Moving shelf
 const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0xff6633 });
 const shelfGeo = new THREE.BoxGeometry(14, 1, 6);
 const shelf = new THREE.Mesh(shelfGeo, shelfMaterial);
 shelf.position.set(0, 1, 5);
 scene.add(shelf);
 
-// DEBUG CUBE (red glowing)
-const debugGeometry = new THREE.BoxGeometry(2, 2, 2);
-const debugMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xaa0000 });
-const debugCube = new THREE.Mesh(debugGeometry, debugMaterial);
-debugCube.position.set(0, 5, 2);
-scene.add(debugCube);
+// Neon text "Coin Aura"
+const fontLoader = new THREE.FontLoader();
+fontLoader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', function (font) {
+  const textGeo = new THREE.TextGeometry("Coin Aura", {
+    font: font,
+    size: 2,
+    height: 0.5,
+    curveSegments: 12,
+    bevelEnabled: true,
+    bevelThickness: 0.1,
+    bevelSize: 0.05,
+    bevelSegments: 5
+  });
 
-const debugLight = new THREE.PointLight(0xff0000, 2, 50);
-debugLight.position.set(0, 10, 10);
-scene.add(debugLight);
+  const textMaterial = new THREE.MeshStandardMaterial({
+    color: 0x00ffff,
+    emissive: 0x00ffff,
+    emissiveIntensity: 2
+  });
+
+  const textMesh = new THREE.Mesh(textGeo, textMaterial);
+  textMesh.position.set(-7, 15, -9.5); // On the back wall
+  scene.add(textMesh);
+
+  // Glow light for the neon effect
+  const neonLight = new THREE.PointLight(0x00ffff, 2, 30);
+  neonLight.position.set(0, 15, -8);
+  scene.add(neonLight);
+});
 
 // Animate
 function animate() {
