@@ -1,127 +1,83 @@
-// script.js — Coin Aura Cabinet (open front, tall back/sides, neon-ready)
-
 import * as THREE from './three.module.js';
 import * as CANNON from './cannon-es.js';
 
-const container = document.getElementById('container');
-const scoreNum = document.getElementById('scoreNum');
-const dropBtn = document.getElementById('dropBtn');
+// Scene, camera, renderer
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a1a);
 
-let score = 0;
-const coins = [];
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// Camera slightly above and pulled back
+camera.position.set(0, 15, 25);
+camera.lookAt(0, 5, 0);
 
-// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x071022);
-container.appendChild(renderer.domElement);
+document.body.appendChild(renderer.domElement);
 
-// Scene & Camera
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 12, -18);   // in front of cabinet
-camera.lookAt(0, 6, 6);           // looking inside
-scene.add(camera);
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
 
-// Lights
-const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-scene.add(hemi);
-const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-dir.position.set(10, 30, -10);
-scene.add(dir);
+const spotLight = new THREE.SpotLight(0xffffff, 1.2);
+spotLight.position.set(20, 40, 20);
+spotLight.castShadow = true;
+scene.add(spotLight);
 
-// Physics
-const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
-world.broadphase = new CANNON.SAPBroadphase(world);
+// Physics world
+const world = new CANNON.World({
+  gravity: new CANNON.Vec3(0, -9.82, 0),
+});
+world.solver.iterations = 20;
 
-// Materials
-const groundMat = new CANNON.Material('ground');
-const coinMat = new CANNON.Material('coin');
-world.addContactMaterial(new CANNON.ContactMaterial(groundMat, coinMat, { friction: 0.4, restitution: 0.05 }));
+// Cabinet walls
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x5c3d2e });
 
-// Helpers: mesh + body
-function createBox(w, h, d, x, y, z, color, physics = true, mass = 0, material = groundMat) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color })
-  );
+function createWall(w, h, d, x, y, z) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mesh = new THREE.Mesh(geo, wallMaterial);
   mesh.position.set(x, y, z);
   scene.add(mesh);
-
-  let body = null;
-  if (physics) {
-    body = new CANNON.Body({ mass, material });
-    body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
-    body.position.set(x, y, z);
-    world.addBody(body);
-  }
-  return { mesh, body };
+  return mesh;
 }
 
-// Cabinet dimensions
-const W = 12, H = 12, D = 14;
-
 // Floor
-createBox(W, 1, D, 0, 0, 6, 0x886644);
+createWall(20, 1, 20, 0, 0, 0);
 
-// Side walls
-createBox(1, H, D, -W / 2, H / 2, 6, 0x654321);
-createBox(1, H, D, W / 2, H / 2, 6, 0x654321);
+// Left + right walls
+createWall(1, 15, 20, -10, 7.5, 0);
+createWall(1, 15, 20, 10, 7.5, 0);
 
-// Back wall
-createBox(W, H, 1, 0, H / 2, D + 0.5, 0x654321);
+// Back wall (higher for neon sign later)
+createWall(20, 20, 1, 0, 10, -10);
 
-// Collector tray (front, open)
-createBox(W, 1, 4, 0, -0.5, -2, 0x443322);
+// Moving shelf (orange)
+const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0xff6633 });
+const shelfGeo = new THREE.BoxGeometry(14, 1, 6);
+const shelf = new THREE.Mesh(shelfGeo, shelfMaterial);
+shelf.position.set(0, 1, 5);
+scene.add(shelf);
 
-// Pusher
-const pusherData = createBox(W - 3, 1, 3, 0, 1, 4, 0xff6633, true, 0, groundMat);
-const pusherMesh = pusherData.mesh;
-const pusherBody = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: groundMat });
-pusherBody.addShape(new CANNON.Box(new CANNON.Vec3((W - 3) / 2, 0.5, 1.5)));
-pusherBody.position.set(0, 1, 4);
-world.addBody(pusherBody);
+// DEBUG CUBE (red glowing)
+const debugGeometry = new THREE.BoxGeometry(2, 2, 2);
+const debugMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xaa0000 });
+const debugCube = new THREE.Mesh(debugGeometry, debugMaterial);
+debugCube.position.set(0, 5, 6);
+scene.add(debugCube);
 
-let phase = 0, speed = 0.02, amp = 3;
-
-// Drop Coin
-dropBtn.addEventListener('click', () => {
-  const radius = 0.6;
-  const geo = new THREE.CylinderGeometry(radius, radius, 0.2, 32);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffd166, metalness: 0.5, roughness: 0.3 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(0, 10, 8);
-  scene.add(mesh);
-
-  const body = new CANNON.Body({
-    mass: 0.3,
-    shape: new CANNON.Cylinder(radius, radius, 0.2, 16),
-    material: coinMat
-  });
-  body.position.set(0, 10, 8);
-  world.addBody(body);
-
-  coins.push({ mesh, body });
-});
+const debugLight = new THREE.PointLight(0xff0000, 2, 50);
+debugLight.position.set(0, 10, 10);
+scene.add(debugLight);
 
 // Animate
 function animate() {
   requestAnimationFrame(animate);
-  world.step(1 / 60);
-
-  // Update coins
-  coins.forEach(({ mesh, body }) => {
-    mesh.position.copy(body.position);
-    mesh.quaternion.copy(body.quaternion);
-  });
-
-  // Move pusher
-  phase += speed;
-  const z = 4 + Math.sin(phase) * amp;
-  pusherBody.position.z = z;
-  pusherMesh.position.z = z;
-
   renderer.render(scene, camera);
 }
 animate();
+
+// Resize handling
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
