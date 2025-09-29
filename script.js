@@ -1,8 +1,6 @@
 // script.js
 
 import * as THREE from './three.module.js';
-import { FontLoader } from './FontLoader.js';
-import { TextGeometry } from './TextGeometry.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -19,7 +17,7 @@ const pointLight = new THREE.PointLight(0xffffff, 1);
 pointLight.position.set(10, 10, 10);
 scene.add(pointLight);
 
-// Cabinet
+// Cabinet walls
 const material = new THREE.MeshStandardMaterial({ color: 0xcd853f, side: THREE.DoubleSide });
 const wallGeometry = new THREE.PlaneGeometry(20, 20);
 
@@ -45,36 +43,6 @@ const floor = new THREE.Mesh(wallGeometry, material);
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -10;
 scene.add(floor);
-
-// Neon Text "Coin Aura"
-const fontLoader = new FontLoader();
-fontLoader.load('./helvetiker_regular.typeface.json', function (font) {
-  const textGeo = new TextGeometry('Coin Aura', {
-    font: font,
-    size: 2,
-    height: 0.5,
-    curveSegments: 12,
-    bevelEnabled: true,
-    bevelThickness: 0.1,
-    bevelSize: 0.05,
-    bevelSegments: 5
-  });
-
-  const textMaterial = new THREE.MeshStandardMaterial({
-    color: 0x00ffff,
-    emissive: 0x00ffff,
-    emissiveIntensity: 2
-  });
-
-  const textMesh = new THREE.Mesh(textGeo, textMaterial);
-  textMesh.position.set(-7, 5, -9.5); // on the back wall
-  scene.add(textMesh);
-
-  // Neon glow light
-  const neonLight = new THREE.PointLight(0x00ffff, 2, 50);
-  neonLight.position.set(0, 5, -8);
-  scene.add(neonLight);
-});
 
 // Camera position
 camera.position.set(0, 0, 20);
