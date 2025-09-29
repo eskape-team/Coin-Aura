@@ -3,16 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Coin Pusher</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Coin Pusher — RacCoin style</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="topbar">Score: <span id="score">0</span></div>
-  <div id="container"></div>
+  <div id="header">
+    <div id="score">Score: <span id="scoreValue">0</span></div>
+  </div>
 
-  <button id="dropBtn">Drop Coin</button>
+  <!-- The 3D canvas will be added by script.js -->
+  <div id="ui">
+    <button id="dropBtn">Drop Coin</button>
+    <div id="tips">Tap Drop Coin to add a coin</div>
+  </div>
 
-  <!-- Main script as a module (imports three + cannon-es by URL) -->
-  <script type="module" src="./script.js"></script>
+  <!-- main script (module) -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>
