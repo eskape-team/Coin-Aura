@@ -7,7 +7,7 @@ scene.background = new THREE.Color(0x0d0d1a);
 
 // ----- CAMERA -----
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 5, 10);
+camera.position.set(0, 5, 12);
 camera.lookAt(0, 2, 0);
 
 // ----- RENDERER -----
@@ -19,7 +19,6 @@ document.body.appendChild(renderer.domElement);
 const world = new CANNON.World();
 world.gravity.set(0, -9.82, 0);
 
-// Materials
 const defaultMat = new CANNON.Material('default');
 const contactMat = new CANNON.ContactMaterial(defaultMat, defaultMat, {
   friction: 0.3,
@@ -28,55 +27,52 @@ const contactMat = new CANNON.ContactMaterial(defaultMat, defaultMat, {
 world.addContactMaterial(contactMat);
 
 // ----- LIGHTING -----
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
 dirLight.position.set(10, 10, 5);
 scene.add(dirLight);
 
 // ----- CABINET -----
-const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x444444, side: THREE.DoubleSide });
+const wallMat = new THREE.MeshPhongMaterial({ color: 0x444444, side: THREE.DoubleSide });
 const wallThickness = 0.2;
 const cabinetWidth = 6;
 const cabinetDepth = 10;
 const cabinetHeight = 6;
 
+// Helper to make wall mesh + physics
+function makeWall(width, height, depth, x, y, z) {
+  const geo = new THREE.BoxGeometry(width, height, depth);
+  const mesh = new THREE.Mesh(geo, wallMat);
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+
+  const body = new CANNON.Body({
+    mass: 0,
+    shape: new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2)),
+    position: new CANNON.Vec3(x, y, z),
+    material: defaultMat
+  });
+  world.addBody(body);
+  return { mesh, body };
+}
+
 // Back wall
-const backWallGeo = new THREE.BoxGeometry(cabinetWidth, cabinetHeight, wallThickness);
-const backWall = new THREE.Mesh(backWallGeo, wallMaterial);
-backWall.position.set(0, cabinetHeight / 2, -cabinetDepth / 2);
-scene.add(backWall);
-
-// Side walls
-const sideWallGeo = new THREE.BoxGeometry(wallThickness, cabinetHeight, cabinetDepth);
-const leftWall = new THREE.Mesh(sideWallGeo, wallMaterial);
-leftWall.position.set(-cabinetWidth / 2, cabinetHeight / 2, 0);
-scene.add(leftWall);
-const rightWall = new THREE.Mesh(sideWallGeo, wallMaterial);
-rightWall.position.set(cabinetWidth / 2, cabinetHeight / 2, 0);
-scene.add(rightWall);
-
+makeWall(cabinetWidth, cabinetHeight, wallThickness, 0, cabinetHeight / 2, -cabinetDepth / 2);
+// Left wall
+makeWall(wallThickness, cabinetHeight, cabinetDepth, -cabinetWidth / 2, cabinetHeight / 2, 0);
+// Right wall
+makeWall(wallThickness, cabinetHeight, cabinetDepth, cabinetWidth / 2, cabinetHeight / 2, 0);
 // Floor
-const floorGeo = new THREE.BoxGeometry(cabinetWidth, wallThickness, cabinetDepth);
-const floor = new THREE.Mesh(floorGeo, wallMaterial);
-floor.position.set(0, 0, 0);
-scene.add(floor);
+makeWall(cabinetWidth, wallThickness, cabinetDepth, 0, 0, 0);
 
-const floorBody = new CANNON.Body({
-  mass: 0,
-  shape: new CANNON.Box(new CANNON.Vec3(cabinetWidth / 2, wallThickness / 2, cabinetDepth / 2)),
-  position: new CANNON.Vec3(0, 0, 0)
-});
-world.addBody(floorBody);
-
-// ----- MOVING SHELF -----
-const shelfMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
+// ----- SHELF -----
+const shelfColor = new THREE.MeshPhongMaterial({ color: 0x0000ff });
 const shelfWidth = 5.5;
 const shelfDepth = 3;
 const shelfHeight = 0.3;
 
 const shelfGeo = new THREE.BoxGeometry(shelfWidth, shelfHeight, shelfDepth);
-const shelf = new THREE.Mesh(shelfGeo, shelfMaterial);
+const shelf = new THREE.Mesh(shelfGeo, shelfColor);
 shelf.position.set(0, 1, -2);
 scene.add(shelf);
 
@@ -88,14 +84,14 @@ const shelfBody = new CANNON.Body({
 });
 world.addBody(shelfBody);
 
-// Invisible extension (prevents coins falling behind)
-const extensionBody = new CANNON.Body({
+// Invisible back extension
+const backExt = new CANNON.Body({
   mass: 0,
   shape: new CANNON.Box(new CANNON.Vec3(shelfWidth / 2, shelfHeight / 2, 1)),
   position: new CANNON.Vec3(0, 1, -2 - shelfDepth / 2 - 1),
   material: defaultMat
 });
-world.addBody(extensionBody);
+world.addBody(backExt);
 
 // Shelf motion
 let shelfDir = 1;
@@ -122,6 +118,7 @@ function dropCoin() {
     position: new CANNON.Vec3(0, 5, -2),
     material: defaultMat
   });
+  coinBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
   world.addBody(coinBody);
 
   coins.push(coin);
@@ -145,12 +142,11 @@ dropBtn.style.cursor = 'pointer';
 document.body.appendChild(dropBtn);
 dropBtn.addEventListener('click', dropCoin);
 
-// ----- ANIMATION LOOP -----
+// ----- LOOP -----
 const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
-
   const delta = clock.getDelta();
   world.step(1 / 60, delta, 3);
 
@@ -162,18 +158,16 @@ function animate() {
   shelf.position.copy(shelfBody.position);
   shelf.quaternion.copy(shelfBody.quaternion);
 
-  // Move extension with shelf
-  extensionBody.position.z = shelfBody.position.z - shelfDepth / 2 - 1;
+  // Move invisible extension
+  backExt.position.z = shelfBody.position.z - shelfDepth / 2 - 1;
 
-  // Apply shelf movement to coins resting on it
+  // Coins
   coinBodies.forEach((coinBody, i) => {
     const coin = coins[i];
-
-    // Sync position
     coin.position.copy(coinBody.position);
     coin.quaternion.copy(coinBody.quaternion);
 
-    // If coin is close to shelf height, nudge it with shelf velocity
+    // If coin is sitting on shelf, apply motion
     if (Math.abs(coinBody.position.y - shelfBody.position.y) < 0.5) {
       coinBody.velocity.z += shelfDir * shelfSpeed * 0.05;
     }
