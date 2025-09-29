@@ -1,97 +1,125 @@
-import * as THREE from './three.module.js';
-import * as CANNON from './cannon-es.js';
+// script.js
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a1a);
-
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 20, 35);
-camera.lookAt(0, 10, 0);
-
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Lights
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
 
-const spotLight = new THREE.SpotLight(0xffffff, 1.2);
-spotLight.position.set(20, 50, 30);
-spotLight.castShadow = true;
-scene.add(spotLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(10, 20, 10);
+scene.add(directionalLight);
 
-// Cabinet material
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
+// Cabinet parts
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
 
-// Helper to create walls
-function createWall(w, h, d, x, y, z) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const mesh = new THREE.Mesh(geo, wallMaterial);
-  mesh.position.set(x, y, z);
-  scene.add(mesh);
-}
+// Left wall
+const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 20, 20), wallMaterial);
+leftWall.position.set(-10, 10, 0);
+scene.add(leftWall);
 
-// Cabinet pieces
-createWall(20, 1, 20, 0, 0, 0);         // Floor
-createWall(1, 20, 20, -10, 10, 0);      // Left wall
-createWall(1, 20, 20, 10, 10, 0);       // Right wall
-createWall(20, 20, 1, 0, 10, -10);      // Back wall
+// Right wall
+const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1, 20, 20), wallMaterial);
+rightWall.position.set(10, 10, 0);
+scene.add(rightWall);
 
-// Shelf
-const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0xff6633 });
-const shelf = new THREE.Mesh(new THREE.BoxGeometry(14, 1, 6), shelfMaterial);
-shelf.position.set(0, 1, 5);
+// Back wall
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 1), wallMaterial);
+backWall.position.set(0, 10, -10);
+scene.add(backWall);
+
+// Floor
+const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 20), wallMaterial);
+floor.position.set(0, 0, 0);
+scene.add(floor);
+
+// Moving shelf
+const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0xff7f50 });
+const shelf = new THREE.Mesh(new THREE.BoxGeometry(18, 1, 6), shelfMaterial);
+shelf.position.set(0, 2, 0);
 scene.add(shelf);
+
+// Coins
+const coinGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32);
+const coinMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 });
+let coins = [];
+
+// Drop coin button
+document.getElementById("dropCoinBtn").addEventListener("click", () => {
+  const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+  coin.position.set(0, 18, 0);
+  scene.add(coin);
+  coins.push(coin);
+});
 
 // Neon text "Coin Aura"
 let neonLight;
 const fontLoader = new THREE.FontLoader();
-fontLoader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', function (font) {
-  const textGeo = new THREE.TextGeometry("Coin Aura", {
-    font: font,
-    size: 2,
-    height: 0.5,
-    curveSegments: 12,
-    bevelEnabled: true,
-    bevelThickness: 0.1,
-    bevelSize: 0.05,
-    bevelSegments: 5
-  });
 
-  const textMaterial = new THREE.MeshStandardMaterial({
-    color: 0x00ffff,
-    emissive: 0x00ffff,
-    emissiveIntensity: 2
-  });
+fontLoader.load(
+  "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+  function (font) {
+    const textGeo = new THREE.TextGeometry("Coin Aura", {
+      font: font,
+      size: 2,
+      height: 0.5,
+      curveSegments: 12,
+      bevelEnabled: true,
+      bevelThickness: 0.1,
+      bevelSize: 0.05,
+      bevelSegments: 5
+    });
 
-  const textMesh = new THREE.Mesh(textGeo, textMaterial);
-  textMesh.position.set(-7, 15, -9.5); // Place on back wall
-  scene.add(textMesh);
+    const textMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00ffff,
+      emissive: 0x00ffff,
+      emissiveIntensity: 2
+    });
 
-  // Neon glow light
-  neonLight = new THREE.PointLight(0x00ffff, 2, 40);
-  neonLight.position.set(0, 15, -8);
-  scene.add(neonLight);
-});
+    const textMesh = new THREE.Mesh(textGeo, textMaterial);
+    textMesh.position.set(-7, 15, -9.5); // position on back wall
+    scene.add(textMesh);
 
-// Animation loop
-let t = 0;
+    // Neon glow light
+    neonLight = new THREE.PointLight(0x00ffff, 2, 50);
+    neonLight.position.set(0, 15, -9);
+    scene.add(neonLight);
+  }
+);
+
+// Camera
+camera.position.set(0, 10, 25);
+
+// Animation
+let shelfDirection = 1;
+
 function animate() {
   requestAnimationFrame(animate);
 
-  // Pulse neon glow
-  if (neonLight) {
-    t += 0.05;
-    neonLight.intensity = 1.5 + Math.sin(t) * 0.5;
+  // Animate shelf
+  shelf.position.z += 0.05 * shelfDirection;
+  if (shelf.position.z > 4 || shelf.position.z < -4) {
+    shelfDirection *= -1;
   }
+
+  // Animate coins falling
+  coins.forEach((coin) => {
+    if (coin.position.y > 1) {
+      coin.position.y -= 0.1; // fall down
+    }
+  });
 
   renderer.render(scene, camera);
 }
 animate();
 
-// Resize support
-window.addEventListener('resize', () => {
+// Resize handling
+window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
