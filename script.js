@@ -3,7 +3,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a1a);
 
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 6, 9);
+camera.position.set(0, 6, 11); // pulled back so cabinet always visible
 camera.lookAt(0, 2, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -40,27 +40,25 @@ const CABINET_HEIGHT = 6;
 
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, side: THREE.DoubleSide });
 
-function makeWall(w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) {
+function makeWall(w, h, d, x, y, z) {
   const geom = new THREE.BoxGeometry(w, h, d);
   const mesh = new THREE.Mesh(geom, wallMaterial);
   mesh.position.set(x, y, z);
-  mesh.rotation.set(rx, ry, rz);
   scene.add(mesh);
 
   const shape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
   const body = new CANNON.Body({ mass: 0, material: shelfMat });
   body.addShape(shape);
   body.position.copy(mesh.position);
-  body.quaternion.copy(mesh.quaternion);
   world.addBody(body);
 }
 
-// Cabinet walls (moved outward so they’re visible)
-makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, -CABINET_DEPTH / 2); // back
-makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, CABINET_DEPTH / 2 + 0.1);  // front (slightly forward)
-makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, -CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0); // left
-makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0);  // right
-makeWall(CABINET_WIDTH, 0.2, CABINET_DEPTH, 0, 0, 0);                                   // bottom
+// Cabinet walls (slightly farther apart so always visible)
+makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, -CABINET_DEPTH / 2);   // back
+makeWall(CABINET_WIDTH, CABINET_HEIGHT, 0.2, 0, CABINET_HEIGHT / 2, CABINET_DEPTH / 2);    // front lip
+makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, -CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0);   // left
+makeWall(0.2, CABINET_HEIGHT, CABINET_DEPTH, CABINET_WIDTH / 2, CABINET_HEIGHT / 2, 0);    // right
+makeWall(CABINET_WIDTH, 0.2, CABINET_DEPTH, 0, 0, 0);                                      // bottom
 
 // ================== Moving Shelf ==================
 const SHELF_Y = 1.2;
@@ -88,14 +86,12 @@ function dropCoin() {
   const radius = 0.28;
   const thickness = 0.12;
 
-  // THREE visual coin
+  // THREE coin mesh
   const geom = new THREE.CylinderGeometry(radius, radius, thickness, 32);
   const mat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
   const mesh = new THREE.Mesh(geom, mat);
-  mesh.rotation.x = Math.PI / 2; // flat
-  const spawnX = (Math.random() - 0.5) * 1.5;
-  const spawnZ = shelfMesh.position.z - 0.2;
-  mesh.position.set(spawnX, SHELF_Y + 3, spawnZ);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.set((Math.random() - 0.5) * 1.5, SHELF_Y + 3, shelfMesh.position.z);
   scene.add(mesh);
 
   // CANNON coin body
@@ -103,7 +99,7 @@ function dropCoin() {
   const body = new CANNON.Body({ mass: 0.55, material: coinMat });
   body.addShape(shape);
 
-  // Rotate physics cylinder to lay flat
+  // rotate physics to lie flat
   const q = new CANNON.Quaternion();
   q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
   body.shapeOrientations[0] = q;
@@ -123,7 +119,7 @@ document.getElementById("dropButton").addEventListener("click", dropCoin);
 function animate() {
   requestAnimationFrame(animate);
 
-  // Move shelf
+  // Shelf slide
   shelfBody.position.z += SHELF_SPEED * shelfDirection;
   if (shelfBody.position.z > SHELF_RANGE || shelfBody.position.z < -SHELF_RANGE) {
     shelfDirection *= -1;
@@ -133,7 +129,7 @@ function animate() {
   // Step physics
   world.step(1 / 60);
 
-  // Sync coin positions
+  // Sync coins
   coinPool.forEach(({ mesh, body }) => {
     mesh.position.copy(body.position);
     mesh.quaternion.copy(body.quaternion);
