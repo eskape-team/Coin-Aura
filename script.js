@@ -1,4 +1,4 @@
-// script.js — Arcade Coin Pusher (open front, two-tier, proper view)
+// script.js — Coin Pusher (front-facing, back closed, coins pushed forward)
 
 import * as THREE from './three.module.js';
 import * as CANNON from './cannon-es.js';
@@ -6,11 +6,9 @@ import * as CANNON from './cannon-es.js';
 const container = document.getElementById('container');
 const scoreNum = document.getElementById('scoreNum');
 const dropBtn = document.getElementById('dropBtn');
-const overlay = document.getElementById('overlay');
 const restartBtn = document.getElementById('restartBtn');
 
 let score = 0;
-let gameOver = false;
 const coins = [];
 
 // Renderer
@@ -23,14 +21,14 @@ container.appendChild(renderer.domElement);
 // Scene + Camera
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 40, 100); // arcade-style view
-camera.lookAt(0, 10, 0);
+// place camera in front of cabinet (positive Z)
+camera.position.set(0, 50, 120);
+camera.lookAt(0, 0, 0);
 
 // Lights
-const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-scene.add(hemi);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.7));
 const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-dir.position.set(40, 100, 50);
+dir.position.set(40, 120, 50);
 scene.add(dir);
 
 // Physics world
@@ -42,13 +40,16 @@ world.solver.iterations = 12;
 const groundMat = new CANNON.Material('ground');
 const coinMat = new CANNON.Material('coin');
 const metalMat = new CANNON.Material('metal');
+
 world.addContactMaterial(new CANNON.ContactMaterial(groundMat, coinMat, { friction: 0.45, restitution: 0.02 }));
 world.addContactMaterial(new CANNON.ContactMaterial(coinMat, coinMat, { friction: 0.35, restitution: 0.02 }));
+world.addContactMaterial(new CANNON.ContactMaterial(coinMat, metalMat, { friction: 0.4, restitution: 0.02 }));
 
 // Cabinet dimensions
-const PW = 40, PD = 80;
+const PW = 40;  // width
+const PD = 80;  // depth
 
-// --- Walls (only sides + back, no front wall) ---
+// Helper to add static walls (sides/back)
 function addWall(x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: 0x4b2f1b }));
   mesh.position.set(x, y + h / 2, z);
@@ -60,104 +61,132 @@ function addWall(x, y, z, w, h, d) {
   world.addBody(body);
 }
 
-addWall(-PW / 2 - 1, 0, 0, 2, 30, PD + 6); // left wall
-addWall(PW / 2 + 1, 0, 0, 2, 30, PD + 6);  // right wall
-addWall(0, 0, PD / 2 + 1, PW + 6, 30, 2);  // back wall
-// 🚫 no front wall at all
+// --- Place walls so the back is at negative Z (front faces camera) ---
+// left & right walls (same)
+addWall(-PW / 2 - 1, 0, 0, 2, 30, PD + 6);
+addWall(PW / 2 + 1, 0, 0, 2, 30, PD + 6);
 
-// --- Platforms (like in the real machine) ---
+// BACK wall: negative Z side (far side)
+addWall(0, 0, -PD / 2 - 1, PW + 6, 30, 2);
+
+// --- Platforms and tray ---
+// Material for platforms
 const platMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.8, metalness: 0.05 });
 
-// Upper platform (thin + lower)
-const upperGeo = new THREE.BoxGeometry(PW, 1, PD / 2);
+// Upper platform: thin and pulled back (near the back wall)
+const upperDepth = PD / 2 - 10; // make it a bit shorter than full depth
+const upperZ = -PD / 4 - 6;      // pulled toward the back
+const upperY = -3;
+
+const upperGeo = new THREE.BoxGeometry(PW, 0.5, upperDepth);
 const upperMesh = new THREE.Mesh(upperGeo, platMat);
-upperMesh.position.set(0, -3, 0);
+upperMesh.position.set(0, upperY, upperZ);
 scene.add(upperMesh);
 
 const upperBody = new CANNON.Body({ mass: 0, material: groundMat });
-upperBody.addShape(new CANNON.Box(new CANNON.Vec3(PW / 2, 0.5, PD / 4)));
-upperBody.position.set(0, -3, 0);
+upperBody.addShape(new CANNON.Box(new CANNON.Vec3(PW / 2, 0.25, upperDepth / 2)));
+upperBody.position.set(0, upperY, upperZ);
 world.addBody(upperBody);
 
-// Lower platform
-const lowerGeo = new THREE.BoxGeometry(PW, 1, PD / 2);
+// Lower platform: shallower and closer to front (so front stays open)
+const lowerDepth = PD / 2 - 10;
+const lowerZ = -6;   // closer to front than upper
+const lowerY = -8;
+
+const lowerGeo = new THREE.BoxGeometry(PW, 0.5, lowerDepth);
 const lowerMesh = new THREE.Mesh(lowerGeo, platMat);
-lowerMesh.position.set(0, -8, -PD / 4 - 5);
+lowerMesh.position.set(0, lowerY, lowerZ);
 scene.add(lowerMesh);
 
 const lowerBody = new CANNON.Body({ mass: 0, material: groundMat });
-lowerBody.addShape(new CANNON.Box(new CANNON.Vec3(PW / 2, 0.5, PD / 4)));
-lowerBody.position.set(0, -8, -PD / 4 - 5);
+lowerBody.addShape(new CANNON.Box(new CANNON.Vec3(PW / 2, 0.25, lowerDepth / 2)));
+lowerBody.position.set(0, lowerY, lowerZ);
 world.addBody(lowerBody);
 
-// --- Collector tray ---
-const trayGeo = new THREE.PlaneGeometry(PW + 6, 8);
+// Collector tray (flat, at the very front)
+const trayZ = 18; // position positive Z in front of lower platform
+const trayGeo = new THREE.PlaneGeometry(PW + 6, 12);
 const trayMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, side: THREE.DoubleSide });
 const trayMesh = new THREE.Mesh(trayGeo, trayMat);
 trayMesh.rotation.x = -Math.PI / 2;
-trayMesh.position.set(0, -9.5, -PD / 2 - 6);
+trayMesh.position.set(0, -9.5, trayZ);
 scene.add(trayMesh);
 
 const trayBody = new CANNON.Body({ mass: 0, material: groundMat });
-trayBody.addShape(new CANNON.Box(new CANNON.Vec3((PW + 6) / 2, 0.1, 4)));
-trayBody.position.set(0, -9.5, -PD / 2 - 6);
+trayBody.addShape(new CANNON.Box(new CANNON.Vec3((PW + 6) / 2, 0.1, 6)));
+trayBody.position.set(0, -9.5, trayZ);
 world.addBody(trayBody);
 
-const collectorZ = -PD / 2 - 10;
+// When coin z > collectorZ it's into the tray (front)
+const collectorZ = trayZ - 2;
 
-// --- Pusher ---
+// --- Pusher (on the upper platform) ---
 const pW = PW - 8, pH = 2, pD = 12;
-const pMesh = new THREE.Mesh(new THREE.BoxGeometry(pW, pH, pD), new THREE.MeshStandardMaterial({ color: 0xff8a4b, metalness: 0.7, roughness: 0.3 }));
-pMesh.position.set(0, pH / 2, -5);
+const pMaterial = new THREE.MeshStandardMaterial({ color: 0xff8a4b, metalness: 0.6, roughness: 0.25 });
+
+// put pusher on the upper platform (near its center)
+const pCenterZ = upperZ + 6; // slightly towards the center of the upper platform
+const pCenterY = upperY + pH / 2;
+
+const pMesh = new THREE.Mesh(new THREE.BoxGeometry(pW, pH, pD), pMaterial);
+pMesh.position.set(0, pCenterY, pCenterZ);
 scene.add(pMesh);
 
 const pBody = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: metalMat });
 pBody.addShape(new CANNON.Box(new CANNON.Vec3(pW / 2, pH / 2, pD / 2)));
-pBody.position.set(0, pH / 2, -5);
+pBody.position.set(0, pCenterY, pCenterZ);
 world.addBody(pBody);
 
 let phase = 0;
-let pSpeed = 0.004;
-let pAmp = 10;
+let pSpeed = 0.005;
+let pAmp = 14; // how far the pusher moves (adjust if it over-extends)
 
-// --- Drop coin ---
+// --- Drop coin (spawn at the back, on top of the upper platform) ---
 dropBtn.addEventListener('click', () => {
-  if (gameOver) return;
-
   const radius = 2;
-  const geo = new THREE.CylinderGeometry(radius, radius, 0.5, 32);
+  const height = 0.5;
+
+  const geo = new THREE.CylinderGeometry(radius, radius, height, 24);
   const mat = new THREE.MeshStandardMaterial({ color: 0xffd166, metalness: 0.6, roughness: 0.3 });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = true;
 
-  mesh.position.set(0, 20, PD / 4);
+  // spawn near the back (above the upper platform)
+  const spawnZ = upperZ - (upperDepth / 2) + 6; // close to the back wall
+  mesh.position.set((Math.random() - 0.5) * (PW - 6), 20, spawnZ);
   scene.add(mesh);
 
+  // cannon cylinder (aligned with Y axis)
   const body = new CANNON.Body({
     mass: 0.3,
-    shape: new CANNON.Cylinder(radius, radius, 0.5, 16),
+    shape: new CANNON.Cylinder(radius, radius, height, 16),
+    position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z),
     material: coinMat
   });
-  body.position.set(0, 20, PD / 4);
-  world.addBody(body);
+  // cannon cylinder axes need rotation to match three.js orientation
+  body.quaternion.setFromEuler(Math.PI / 2, 0, 0, 'XYZ');
 
+  world.addBody(body);
   coins.push({ mesh, body });
 });
 
-// Restart
+// Restart (just reload page)
 restartBtn.addEventListener('click', () => window.location.reload());
 
-// --- Animate ---
+// --- Animate loop ---
 function animate() {
   requestAnimationFrame(animate);
+
   world.step(1 / 60);
 
+  // update coins
   for (let i = coins.length - 1; i >= 0; i--) {
     const { mesh, body } = coins[i];
     mesh.position.copy(body.position);
     mesh.quaternion.copy(body.quaternion);
 
-    if (body.position.z < collectorZ) {
+    // coin fell into the front tray?
+    if (body.position.z > collectorZ + 1) {
       world.removeBody(body);
       scene.remove(mesh);
       coins.splice(i, 1);
@@ -166,9 +195,9 @@ function animate() {
     }
   }
 
-  // Move pusher
+  // move pusher back-and-forth along Z (pushes towards positive Z/front)
   phase += pSpeed;
-  const z = -5 + Math.sin(phase) * pAmp;
+  const z = pCenterZ + Math.sin(phase) * pAmp;
   pBody.position.z = z;
   pMesh.position.z = z;
 
