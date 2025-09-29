@@ -1,7 +1,5 @@
 // script.js
 
-import * as THREE from './three.module.js';
-
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
