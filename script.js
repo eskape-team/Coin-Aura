@@ -1,4 +1,5 @@
-// Import three.js and extras
+// script.js
+
 import * as THREE from './three.module.js';
 import { FontLoader } from './FontLoader.js';
 import { TextGeometry } from './TextGeometry.js';
@@ -15,37 +16,40 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
 
 const pointLight = new THREE.PointLight(0xffffff, 1);
-pointLight.position.set(10, 15, 10);
+pointLight.position.set(10, 10, 10);
 scene.add(pointLight);
 
-// Cabinet (3 walls + floor + platform)
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xcc8844 });
-const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xee9966 });
+// Cabinet
+const material = new THREE.MeshStandardMaterial({ color: 0xcd853f, side: THREE.DoubleSide });
+const wallGeometry = new THREE.PlaneGeometry(20, 20);
 
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(20, 15, 0.5), wallMaterial);
-backWall.position.set(0, 7.5, -10);
+// Back wall
+const backWall = new THREE.Mesh(wallGeometry, material);
+backWall.position.z = -10;
 scene.add(backWall);
 
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 15, 20), wallMaterial);
-leftWall.position.set(-10, 7.5, 0);
+// Left wall
+const leftWall = new THREE.Mesh(wallGeometry, material);
+leftWall.rotation.y = Math.PI / 2;
+leftWall.position.x = -10;
 scene.add(leftWall);
 
-const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 15, 20), wallMaterial);
-rightWall.position.set(10, 7.5, 0);
+// Right wall
+const rightWall = new THREE.Mesh(wallGeometry, material);
+rightWall.rotation.y = -Math.PI / 2;
+rightWall.position.x = 10;
 scene.add(rightWall);
 
-const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 20), floorMaterial);
-floor.position.set(0, 0, 0);
+// Floor
+const floor = new THREE.Mesh(wallGeometry, material);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -10;
 scene.add(floor);
 
-const platform = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 5), floorMaterial);
-platform.position.set(0, 0.5, 5);
-scene.add(platform);
-
-// Neon text "Coin Aura"
+// Neon Text "Coin Aura"
 const fontLoader = new FontLoader();
-fontLoader.load('./helvetiker_regular.typeface.json', (font) => {
-  const textGeo = new TextGeometry("Coin Aura", {
+fontLoader.load('./helvetiker_regular.typeface.json', function (font) {
+  const textGeo = new TextGeometry('Coin Aura', {
     font: font,
     size: 2,
     height: 0.5,
@@ -53,28 +57,27 @@ fontLoader.load('./helvetiker_regular.typeface.json', (font) => {
     bevelEnabled: true,
     bevelThickness: 0.1,
     bevelSize: 0.05,
-    bevelSegments: 5,
+    bevelSegments: 5
   });
 
   const textMaterial = new THREE.MeshStandardMaterial({
     color: 0x00ffff,
     emissive: 0x00ffff,
-    emissiveIntensity: 2,
+    emissiveIntensity: 2
   });
 
   const textMesh = new THREE.Mesh(textGeo, textMaterial);
-  textMesh.position.set(-7, 12, -9.5); // near top of back wall
+  textMesh.position.set(-7, 5, -9.5); // on the back wall
   scene.add(textMesh);
 
   // Neon glow light
-  const neonLight = new THREE.PointLight(0x00ffff, 3, 20);
-  neonLight.position.set(0, 12, -8);
+  const neonLight = new THREE.PointLight(0x00ffff, 2, 50);
+  neonLight.position.set(0, 5, -8);
   scene.add(neonLight);
 });
 
 // Camera position
-camera.position.set(0, 10, 25);
-camera.lookAt(0, 5, 0);
+camera.position.set(0, 0, 20);
 
 // Animate
 function animate() {
