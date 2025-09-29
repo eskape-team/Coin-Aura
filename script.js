@@ -57,12 +57,15 @@ document.getElementById("dropCoinBtn").addEventListener("click", () => {
   coins.push(coin);
 });
 
-// Neon text "Coin Aura"
+// Neon text "Coin Aura" (with safe fallback)
 let neonLight;
 const fontLoader = new THREE.FontLoader();
 
+// Try to load font
 fontLoader.load(
   "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+
+  // On success
   function (font) {
     const textGeo = new THREE.TextGeometry("Coin Aura", {
       font: font,
@@ -82,10 +85,32 @@ fontLoader.load(
     });
 
     const textMesh = new THREE.Mesh(textGeo, textMaterial);
-    textMesh.position.set(-4, 10, -5.5); // attach to back wall
+    textMesh.position.set(-4, 10, -5.5); // stick to back wall
     scene.add(textMesh);
 
     // Neon glow light
+    neonLight = new THREE.PointLight(0x00ffff, 1.5, 30);
+    neonLight.position.set(0, 10, -5);
+    scene.add(neonLight);
+  },
+
+  // On progress (ignore)
+  undefined,
+
+  // On error → fallback cube
+  function (err) {
+    console.warn("Font failed to load. Showing fallback neon cube.");
+    const cubeGeo = new THREE.BoxGeometry(3, 1.5, 0.5);
+    const cubeMat = new THREE.MeshStandardMaterial({
+      color: 0x00ffff,
+      emissive: 0x00ffff,
+      emissiveIntensity: 2
+    });
+    const cube = new THREE.Mesh(cubeGeo, cubeMat);
+    cube.position.set(0, 10, -5.5);
+    scene.add(cube);
+
+    // Glow anyway
     neonLight = new THREE.PointLight(0x00ffff, 1.5, 30);
     neonLight.position.set(0, 10, -5);
     scene.add(neonLight);
@@ -114,6 +139,11 @@ function animate() {
       coin.position.y -= 0.1;
     }
   });
+
+  // Flicker neon glow
+  if (neonLight) {
+    neonLight.intensity = 1.5 + Math.sin(Date.now() * 0.01) * 0.3;
+  }
 
   renderer.render(scene, camera);
 }
